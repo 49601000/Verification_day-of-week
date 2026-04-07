@@ -293,7 +293,7 @@ def render_stat_header(data: Dict[str, Any]):
       <div class="cyb-company">{symbol} 曜日別統計レポート</div>
       <div class="cyb-ticker">総レコード数: {total_records}</div>
       <div class="cyb-price-main">{total_records}</div>
-      <div class="cyb-price-chg">データ期間: 300日</div>
+      <div class="cyb-price-chg">データ期間: 2年</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -450,7 +450,7 @@ def run():
     with st.sidebar:
         st.header("⚙️ 設定")
         ticker = st.text_input("ティッカーシンボル", value="", key="ticker_input")
-        period = st.selectbox("期間", ["1y", "6mo", "3mo"], index=0)
+        period = st.selectbox("期間", ["2y", "1y", "6mo", "3mo"], index=0)
         
         if st.button("分析実行", use_container_width=True):
             with st.spinner("データを取得中..."):
