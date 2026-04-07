@@ -3,14 +3,20 @@ import pandas as pd
 import numpy as np
 import altair as alt
 from typing import Dict, Any
-import sys
-
-# QVTツールのモジュールをインポート
-sys.path.append(r"c:\Users\info\MyAntigravity\02_hobby\01_QVTツール\app")
-from modules.data_fetch import convert_ticker
 
 # 内部モジュールのインポート
 from src.logic.output_stat import get_stat_data_for_skin
+
+# ティッカー変換
+def convert_ticker(raw: str) -> str:
+    t = raw.strip().upper()
+    if not t:
+        return ""
+    if t.endswith(".T"):
+        return t
+    if t.isdigit() and 4 <= len(t) <= 5:
+        return t + ".T"
+    return t
 
 # ─── グローバルスタイル ──────────────────────────────────────────
 

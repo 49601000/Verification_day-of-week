@@ -2,7 +2,7 @@
 
 構成:
 - main.py                # Streamlit 入口
-- requirements.txt       # 依存ライブラリ
+- requirements.txt
 - .streamlit/config.toml # Streamlit 設定
 - config/                # 将来の設定ファイル用フォルダ
 - src/
