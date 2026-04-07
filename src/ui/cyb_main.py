@@ -506,6 +506,7 @@ def run():
                         "total_records": report["metadata"]["total_records"],
                         "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
                         "weekday_stats": report["level_2_stats"],
+                        "test_results": report["level_3_tests"],
                         "group_order": list(report["level_1_grouping"].keys()),
                         "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
                         "descriptions": report["descriptions"]
