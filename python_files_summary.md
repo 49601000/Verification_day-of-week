@@ -1,7 +1,7 @@
 # Python Files Summary for 06_価格バックテスト
 
 ## Overview
-このプロジェクトは、価格バックテストツールで、金融データの分析に焦点を当てています。特に、株価の曜日別統計と統計検定を行います。Streamlitを使用したUIで、サイバーパンク風のデザインです。
+このプロジェクトは、価格バックテストツールで、金融データの分析に焦点を当てています。特に、株価の曜日別統計と統計検定、ならびに六曜モードによる集計分析を行います。Streamlitを使用したUIで、サイバーパンク風のデザインです。
 
 ## Main Entry Point
 - **main.py**: `src.ui.cyb_main` から `run()` をインポートして実行するシンプルなエントリーポイント。
@@ -18,6 +18,7 @@ Streamlitを使用したメインUIモジュール。サイバーパンクテー
   - 推奨検定方式（ANOVA または Kruskal-Wallis）
   を表示する。
 - 特徴: カスタムCSSでダークテーマ、サイバーパンク風の色使い。
+- 追加: サイドバーに「曜日モード / 六曜モード」切り替えを実装。
 
 ### src/logic/output_stat.py
 統計データの集約とレポート生成を担当。
@@ -41,15 +42,16 @@ Streamlitを使用したメインUIモジュール。サイバーパンクテー
 ### src/data/fetch_open_prices.py
 yfinanceから始値データを取得。
 - 関数: `fetch_open_prices()`: 指定ティッカーの始値リストを返却。
-- 特徴: 期間指定可能、デフォルト300日。
+- 特徴: 期間指定可能、デフォルト2年(2y)に対応。
 
 ### src/data/weekday_analysis.py
-データを曜日別に分析。
+データを曜日別/六曜別に分析。
 - 関数:
   - `fetch_open_prices_with_dates()`: 日付付きDataFrame取得。
   - `group_by_weekday()`: 曜日ごとにグループ化 (日本語曜日名)。
-  - `calculate_weekday_stats()`: 曜日別統計量算出 (件数、平均、標準偏差、最小、最大)。
-- 特徴: 平日（月～金）中心だが、土日も含む。
+  - `group_by_rokuyou()`: 六曜ごとにグループ化。
+  - `calculate_weekday_stats()`: グループ別統計量算出 (件数、平均、標準偏差、最小、最大)。
+- 特徴: 曜日モードと六曜モードの両方に対応。
 
 ## Dependencies
 - streamlit, pandas, numpy, altair, yfinance, scipy, statsmodels, scikit-posthocs

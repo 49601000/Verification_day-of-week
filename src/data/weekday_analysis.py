@@ -56,10 +56,53 @@ def group_by_weekday(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
     
     return grouped
 
+
+ROKUYOU_ORDER = ['先勝', '友引', '先負', '仏滅', '大安', '赤口']
+MONTH_FIRST_ROKUYOU = {
+    1: '友引',
+    2: '先負',
+    3: '仏滅',
+    4: '大安',
+    5: '赤口',
+    6: '先勝',
+    7: '友引',
+    8: '先負',
+    9: '仏滅',
+    10: '大安',
+    11: '赤口',
+    12: '先勝'
+}
+
+
+def get_rokuyou_label(date: pd.Timestamp) -> str:
+    """
+    指定した日付から六曜を返します。
+    Gregorian month/day をもとに現代日本のカレンダーに近い六曜計算を行います。
+    """
+    first_day_label = MONTH_FIRST_ROKUYOU.get(date.month, '先勝')
+    start_index = ROKUYOU_ORDER.index(first_day_label)
+    return ROKUYOU_ORDER[(start_index + date.day - 1) % len(ROKUYOU_ORDER)]
+
+
+def group_by_rokuyou(df: pd.DataFrame) -> Dict[str, pd.DataFrame]:
+    """
+    DataFrameを六曜ごとにグループ化します。
+    戻り値: {'先勝': df1, '友引': df2, ...}
+    """
+    if df.empty:
+        return {}
+
+    df['Rokuyou'] = df['Date'].apply(get_rokuyou_label)
+    grouped = {}
+    for label in ROKUYOU_ORDER:
+        grouped[label] = df[df['Rokuyou'] == label].copy()
+    return grouped
+
+
 def calculate_weekday_stats(grouped_data: Dict[str, pd.DataFrame]) -> Dict[str, Dict[str, float]]:
     """
-    曜日ごとの統計量を算出します。
-    戻り値: {'月曜日': {'count': n, 'mean': m, 'std': s, 'min': min, 'max': max}, ...}
+    グループごとの統計量を算出します。
+    戻り値: {'先勝': {'count': n, 'mean': m, 'std': s, 'min': min, 'max': max}, ...}
     """
     stats = {}
     for weekday, df in grouped_data.items():

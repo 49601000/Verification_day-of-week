@@ -287,10 +287,12 @@ def _build_table(headers, rows):
 def render_stat_header(data: Dict[str, Any]):
     symbol = data.get("symbol", "UNKNOWN")
     total_records = data.get("total_records", 0)
+    mode = data.get("analysis_mode", "weekday")
+    mode_label = "六曜モード" if mode == "rokuyou" else "曜日モード"
     
     st.markdown(f"""
     <div class="cyb-price-header">
-      <div class="cyb-company">{symbol} 曜日別統計レポート</div>
+      <div class="cyb-company">{symbol} {mode_label} 統計レポート</div>
       <div class="cyb-ticker">総レコード数: {total_records}</div>
       <div class="cyb-price-main">{total_records}</div>
       <div class="cyb-price-chg">データ期間: 2年</div>
@@ -300,16 +302,19 @@ def render_stat_header(data: Dict[str, Any]):
 
 def render_weekday_stats(data: Dict[str, Any]):
     stats = data.get("weekday_stats", {})
-    weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
+    group_order = data.get("group_order", list(stats.keys()))
+    mode = data.get("analysis_mode", "weekday")
+    title = "六曜別統計量" if mode == "rokuyou" else "曜日別統計量"
+    label = "六曜" if mode == "rokuyou" else "曜日"
     
-    st.markdown("##### 📊 曜日別統計量")
+    st.markdown(f"##### 📊 {title}")
     
     rows = []
-    for weekday in weekdays:
-        if weekday in stats:
-            stat = stats[weekday]
+    for group in group_order:
+        if group in stats:
+            stat = stats[group]
             rows.append([
-                weekday,
+                group,
                 f"{stat['count']}",
                 f"{stat['mean']:.2f}",
                 f"{stat['std']:.2f}",
@@ -317,7 +322,7 @@ def render_weekday_stats(data: Dict[str, Any]):
                 f"{stat['max']:.2f}"
             ])
     
-    st.markdown(_build_table(["曜日", "件数", "平均", "標準偏差", "最小", "最大"], rows), unsafe_allow_html=True)
+    st.markdown(_build_table([label, "件数", "平均", "標準偏差", "最小", "最大"], rows), unsafe_allow_html=True)
 
 
 def render_test_results(data: Dict[str, Any]):
@@ -383,15 +388,17 @@ def render_test_results(data: Dict[str, Any]):
 
 def render_grouped_data_chart(data: Dict[str, Any]):
     grouped_data = data.get("grouped_data", {})
+    group_order = data.get("group_order", list(grouped_data.keys()))
+    mode = data.get("analysis_mode", "weekday")
+    title = "六曜別データ分布" if mode == "rokuyou" else "曜日別データ分布"
+    label = "六曜" if mode == "rokuyou" else "曜日"
     
-    st.markdown("##### 📈 曜日別データ分布")
+    st.markdown(f"##### 📈 {title}")
     
-    # 曜日ごとの平均をプロット
-    weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
     means = []
-    for weekday in weekdays:
-        if weekday in grouped_data:
-            df = pd.DataFrame(grouped_data[weekday])
+    for group in group_order:
+        if group in grouped_data:
+            df = pd.DataFrame(grouped_data[group])
             if not df.empty and 'Open' in df.columns:
                 means.append(df['Open'].mean())
             else:
@@ -400,7 +407,7 @@ def render_grouped_data_chart(data: Dict[str, Any]):
             means.append(0)
     
     chart_data = pd.DataFrame({
-        '曜日': weekdays,
+        label: group_order,
         '平均始値': means
     })
     
@@ -475,7 +482,7 @@ def render_detail_tab(data: Dict[str, Any]):
 def run():
     _setup_style()
     
-    st.title("📊 曜日別統計レポート")
+    st.title("📊 統計レポート")
     st.markdown("---")
     
     # サイドバー: 設定
@@ -483,12 +490,14 @@ def run():
         st.header("⚙️ 設定")
         ticker = st.text_input("ティッカーシンボル", value="", key="ticker_input")
         period = st.selectbox("期間", ["2y", "1y", "6mo", "3mo"], index=0)
+        mode_select = st.selectbox("分析モード", ["曜日モード", "六曜モード"], index=0)
+        analysis_mode = "rokuyou" if mode_select == "六曜モード" else "weekday"
         
         if st.button("分析実行", use_container_width=True):
             with st.spinner("データを取得中..."):
                 ticker_converted = convert_ticker(ticker)
                 try:
-                    data = get_stat_data_for_skin(ticker_converted, period)
+                    data = get_stat_data_for_skin(ticker_converted, period, analysis_mode)
                     st.session_state['stat_data'] = data
                 except Exception as e:
                     st.error(f"エラーが発生しました: {str(e)}")

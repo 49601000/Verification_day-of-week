@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 # 内部モジュールのインポート
-from src.data.weekday_analysis import fetch_open_prices_with_dates, group_by_weekday, calculate_weekday_stats
+from src.data.weekday_analysis import fetch_open_prices_with_dates, group_by_weekday, group_by_rokuyou, calculate_weekday_stats
 from src.logic.statistical_tests import perform_statistical_tests, choose_test_strategy, decide_and_print_tests
 
 def get_indicator_descriptions() -> Dict[str, str]:
@@ -27,15 +27,18 @@ def get_indicator_descriptions() -> Dict[str, str]:
         "posthoc_steel_dwass": "Kruskal-Wallis有意時の多重比較（Steel-Dwass）。"
     }
 
-def get_full_stat_report(df: pd.DataFrame, symbol: str = "UNKNOWN") -> Dict[str, Any]:
+def get_full_stat_report(df: pd.DataFrame, symbol: str = "UNKNOWN", mode: str = "weekday") -> Dict[str, Any]:
     """
-    1. Weekday Grouping (曜日ごとのグループ化)
-    2. Statistics Calculation (統計量算出)
-    3. Statistical Tests (統計検定)
+    1. グループ化
+    2. 統計量算出
+    3. 統計検定
     の3階層を統合したレポートを生成します。
     """
-    # 1. 曜日ごとのグループ化
-    grouped_data = group_by_weekday(df)
+    mode = mode.lower()
+    if mode == "rokuyou":
+        grouped_data = group_by_rokuyou(df)
+    else:
+        grouped_data = group_by_weekday(df)
     
     # 2. 統計量算出
     stats = calculate_weekday_stats(grouped_data)
@@ -53,11 +56,12 @@ def get_full_stat_report(df: pd.DataFrame, symbol: str = "UNKNOWN") -> Dict[str,
         "metadata": {
             "symbol": symbol,
             "total_records": len(df),
-            "period": "1y"  # デフォルト
+            "period": "1y",  # デフォルト
+            "analysis_mode": mode
         }
     }
 
-def get_report_by_ticker_stat(ticker: str, period: str = "300d") -> Dict[str, Any]:
+def get_report_by_ticker_stat(ticker: str, period: str = "300d", mode: str = "weekday") -> Dict[str, Any]:
     """
     ティッカーシンボルを指定して、データの取得から統計レポートの生成までを一括で行います。
     skin.py等のフロントエンドから利用可能な共通インターフェースです。
@@ -65,7 +69,7 @@ def get_report_by_ticker_stat(ticker: str, period: str = "300d") -> Dict[str, An
     df = fetch_open_prices_with_dates(ticker, period)
     if df.empty:
         return {}
-    return get_full_stat_report(df, symbol=ticker)
+    return get_full_stat_report(df, symbol=ticker, mode=mode)
 
 def print_stat_report(result: Dict[str, Any]):
     """
@@ -74,21 +78,20 @@ def print_stat_report(result: Dict[str, Any]):
     metadata = result["metadata"]
     stats = result["level_2_stats"]
     tests = result["level_3_tests"]
+    mode = metadata.get("analysis_mode", "weekday")
+    mode_label = "六曜" if mode == "rokuyou" else "曜日"
     
     print("="*60)
-    print(f" {metadata['symbol']} 曜日別統計レポート")
+    print(f" {metadata['symbol']} {mode_label}統計レポート")
     print("="*60)
     
     print(f"\n[1] 全体情報:")
     print(f"    - 総レコード数: {metadata['total_records']}")
     print(f"    - 期間: {metadata['period']}")
     
-    print(f"\n[2] 曜日別統計量:")
-    weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
-    for weekday in weekdays:
-        if weekday in stats:
-            stat = stats[weekday]
-            print(f"    - {weekday}: 件数={stat['count']}, 平均={stat['mean']:.2f}, 標準偏差={stat['std']:.2f}")
+    print(f"\n[2] {mode_label}別統計量:")
+    for group_name, stat in stats.items():
+        print(f"    - {group_name}: 件数={stat['count']}, 平均={stat['mean']:.2f}, 標準偏差={stat['std']:.2f}")
     
     if "error" in tests:
         print(f"    エラー: {tests['error']}")
@@ -98,11 +101,11 @@ def print_stat_report(result: Dict[str, Any]):
     print("\n" + "="*60)
 
 # skin.py に引き渡すためのインターフェース関数
-def get_stat_data_for_skin(ticker: str, period: str = "300d") -> Dict[str, Any]:
+def get_stat_data_for_skin(ticker: str, period: str = "300d", mode: str = "weekday") -> Dict[str, Any]:
     """
     skin.py が利用しやすい形式で統計データを返却します。
     """
-    report = get_report_by_ticker_stat(ticker, period)
+    report = get_report_by_ticker_stat(ticker, period, mode)
     if not report:
         return {"error": "データ取得または分析に失敗しました。"}
     
@@ -110,8 +113,9 @@ def get_stat_data_for_skin(ticker: str, period: str = "300d") -> Dict[str, Any]:
     return {
         "symbol": report["metadata"]["symbol"],
         "total_records": report["metadata"]["total_records"],
+        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
         "weekday_stats": report["level_2_stats"],
-        "test_results": report["level_3_tests"],
+        "group_order": list(report["level_1_grouping"].keys()),
         "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
         "descriptions": report["descriptions"]
     }

@@ -14,20 +14,19 @@ def perform_statistical_tests(grouped_data: Dict[str, pd.DataFrame]) -> Dict[str
     
     戻り値: 検定結果の辞書
     """
-    # 平日のデータのみを使用（月曜日～金曜日）
-    weekdays = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
     data_lists = []
     labels = []
+    group_order = list(grouped_data.keys())
     
-    for weekday in weekdays:
-        if weekday in grouped_data and not grouped_data[weekday].empty:
-            prices = grouped_data[weekday]['Open'].dropna().tolist()
+    for group in group_order:
+        if group in grouped_data and not grouped_data[group].empty:
+            prices = grouped_data[group]['Open'].dropna().tolist()
             if len(prices) > 0:
                 data_lists.append(prices)
-                labels.extend([weekday] * len(prices))
+                labels.extend([group] * len(prices))
     
     if len(data_lists) < 2:
-        return {"error": "十分なデータがありません。少なくとも2つの曜日のデータが必要です。"}
+        return {"error": "十分なデータがありません。少なくとも2つのグループのデータが必要です。"}
     
     # 全体のデータとラベル
     all_data = [item for sublist in data_lists for item in sublist]
@@ -40,10 +39,10 @@ def perform_statistical_tests(grouped_data: Dict[str, pd.DataFrame]) -> Dict[str
     
     # 正規性テスト (Shapiro-Wilk)
     normality_results = {}
-    for i, weekday in enumerate(weekdays):
+    for i, group in enumerate(group_order):
         if i < len(data_lists):
             stat, p = stats.shapiro(data_lists[i])
-            normality_results[weekday] = {'statistic': stat, 'p_value': p, 'normal': p > 0.05}
+            normality_results[group] = {'statistic': stat, 'p_value': p, 'normal': p > 0.05}
     
     results['parametric']['normality_tests'] = normality_results
     
