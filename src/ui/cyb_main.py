@@ -431,11 +431,43 @@ def render_detail_tab(data: Dict[str, Any]):
     
     st.markdown("##### 📋 生データ")
     grouped_data = data.get("grouped_data", {})
+    
+    # 全曜日のデータを統合（ダウンロード用）
+    all_records = []
+    for weekday, records in grouped_data.items():
+        all_records.extend(records)
+    
+    # 全データダウンロードボタン
+    if all_records:
+        all_df = pd.DataFrame(all_records)
+        csv_data = all_df.to_csv(index=False).encode('utf-8-sig')
+        st.download_button(
+            label="📥 全データをCSVダウンロード",
+            data=csv_data,
+            file_name=f"{data.get('symbol', 'data')}_all_data.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        st.markdown(f"**全データ: {len(all_records)}件**")
+        st.markdown("---")
+    
+    # 曜日別に展開表示
     for weekday, records in grouped_data.items():
         with st.expander(f"{weekday} ({len(records)}件)"):
             if records:
                 df = pd.DataFrame(records)
-                st.dataframe(df.head(10))
+                st.dataframe(df, use_container_width=True)
+                
+                # 曜日別ダウンロードボタン
+                csv_data_weekday = df.to_csv(index=False).encode('utf-8-sig')
+                st.download_button(
+                    label=f"📥 {weekday}をCSVダウンロード",
+                    data=csv_data_weekday,
+                    file_name=f"{data.get('symbol', 'data')}_{weekday}.csv",
+                    mime="text/csv",
+                    use_container_width=True,
+                    key=f"download_{weekday}"
+                )
 
 
 # ─── エントリーポイント ───────────────────────────────────────────
