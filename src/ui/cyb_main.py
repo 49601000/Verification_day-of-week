@@ -9,11 +9,14 @@ from src.logic.output_stat import get_stat_data_for_skin
 
 # ティッカー変換
 def convert_ticker(raw: str) -> str:
-    t = raw.strip().upper()
-    if not t:
+    s = raw.strip()
+    if not s:
         return ""
+    t = s.upper()
     if t.endswith(".T"):
         return t
+    if s.lower().endswith(".t"):
+        return t[:-2] + ".T"
     if t.isdigit() and 4 <= len(t) <= 5:
         return t + ".T"
     return t
