@@ -2,10 +2,10 @@ import yfinance as yf
 import pandas as pd
 from typing import List
 
-def fetch_open_prices(ticker_symbol: str, period: str = "300d") -> List[float]:
+def fetch_open_prices(ticker_symbol: str, period: str = "2y") -> List[float]:
     """
-    指定されたティッカーの任意の日数分の始値データを yfinance から取得します。
-    デフォルトは300日分です。
+    指定されたティッカーの任意の期間分の始値データを yfinance から取得します。
+    デフォルトは2年分です。
     """
     try:
         ticker = yf.Ticker(ticker_symbol)
@@ -29,5 +29,6 @@ if __name__ == "__main__":
     prices = fetch_open_prices(symbol)
     print(f"Retrieved {len(prices)} open prices for {symbol}")
     if prices:
-        print(f"First 5 prices: {prices[:5]}")
-        print(f"Last 5 prices: {prices[-5:]}")
+        print("\nAll prices:")
+        for i, price in enumerate(prices, 1):
+            print(f"{i}: {price}")
