@@ -5,7 +5,8 @@ import altair as alt
 from typing import Dict, Any
 
 # 内部モジュールのインポート
-from src.logic.output_stat import get_stat_data_for_skin
+from src.logic.output_stat import get_full_stat_report
+from src.data.weekday_analysis import fetch_open_prices_with_dates
 
 # ティッカー変換
 def convert_ticker(raw: str) -> str:
@@ -412,8 +413,8 @@ def render_grouped_data_chart(data: Dict[str, Any]):
     })
     
     chart = alt.Chart(chart_data).mark_bar().encode(
-        x='曜日',
-        y='平均始値',
+        x=alt.X(label, type='nominal'),
+        y=alt.Y('平均始値', type='quantitative'),
         color=alt.value('#00f3ff')
     ).properties(
         height=300,
@@ -490,18 +491,60 @@ def run():
         st.header("⚙️ 設定")
         ticker = st.text_input("ティッカーシンボル", value="", key="ticker_input")
         period = st.selectbox("期間", ["2y", "1y", "6mo", "3mo"], index=0)
-        mode_select = st.selectbox("分析モード", ["曜日モード", "六曜モード"], index=0)
-        analysis_mode = "rokuyou" if mode_select == "六曜モード" else "weekday"
         
+        current_mode = st.session_state.get("analysis_mode_select", "曜日モード")
+        analysis_mode = "rokuyou" if current_mode == "六曜モード" else "weekday"
+
         if st.button("分析実行", use_container_width=True):
             with st.spinner("データを取得中..."):
                 ticker_converted = convert_ticker(ticker)
                 try:
-                    data = get_stat_data_for_skin(ticker_converted, period, analysis_mode)
-                    st.session_state['stat_data'] = data
+                    raw_df = fetch_open_prices_with_dates(ticker_converted, period)
+                    report = get_full_stat_report(raw_df, symbol=ticker_converted, mode=analysis_mode)
+                    stat_data = {
+                        "symbol": report["metadata"]["symbol"],
+                        "total_records": report["metadata"]["total_records"],
+                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
+                        "weekday_stats": report["level_2_stats"],
+                        "group_order": list(report["level_1_grouping"].keys()),
+                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
+                        "descriptions": report["descriptions"]
+                    }
+                    st.session_state['raw_df'] = raw_df
+                    st.session_state['last_ticker'] = ticker_converted
+                    st.session_state['last_period'] = period
+                    st.session_state['last_analysis_mode'] = stat_data['analysis_mode']
+                    st.session_state['stat_data'] = stat_data
                 except Exception as e:
                     st.error(f"エラーが発生しました: {str(e)}")
                     st.session_state['stat_data'] = {"error": f"データ取得または分析に失敗しました: {str(e)}"}
+        
+        mode_select = st.selectbox("分析モード", ["曜日モード", "六曜モード"], index=0, key="analysis_mode_select")
+        analysis_mode = "rokuyou" if mode_select == "六曜モード" else "weekday"
+        
+        if 'raw_df' in st.session_state and ticker and period:
+            ticker_converted = convert_ticker(ticker)
+            if ticker_converted == st.session_state.get('last_ticker') and period == st.session_state.get('last_period'):
+                if st.session_state.get('last_analysis_mode') != analysis_mode:
+                    report = get_full_stat_report(st.session_state['raw_df'], symbol=ticker_converted, mode=analysis_mode)
+                    st.session_state['stat_data'] = {
+                        "symbol": report["metadata"]["symbol"],
+                        "total_records": report["metadata"]["total_records"],
+                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
+                        "weekday_stats": report["level_2_stats"],
+                        "group_order": list(report["level_1_grouping"].keys()),
+                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
+                        "descriptions": report["descriptions"]
+                    }
+                    st.session_state['last_analysis_mode'] = analysis_mode
+            else:
+                if 'stat_data' in st.session_state:
+                    st.warning("ティッカーまたは期間を変更した場合は、再度 [分析実行] をクリックしてください。")
+                    st.session_state.pop('stat_data', None)
+                    st.session_state.pop('raw_df', None)
+                    st.session_state.pop('last_ticker', None)
+                    st.session_state.pop('last_period', None)
+                    st.session_state.pop('last_analysis_mode', None)
     
     # メインコンテンツ
     if 'stat_data' in st.session_state:
