@@ -90,6 +90,33 @@ def perform_statistical_tests(grouped_data: Dict[str, pd.DataFrame]) -> Dict[str
     
     return results
 
+def choose_test_strategy(results: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    正規性と等分散性の結果に基づいて、使用すべき検定手法を決定します。
+    """
+    param = results.get('parametric', {})
+    normality_tests = param.get('normality_tests', {})
+    normality_ok = all(res.get('normal', False) for res in normality_tests.values()) if normality_tests else False
+    homoscedasticity_ok = param.get('homoscedasticity_test', {}).get('homoscedastic', False)
+    use_parametric = normality_ok and homoscedasticity_ok
+    selected_test = 'anova' if use_parametric else 'kruskal_wallis'
+    reasons = []
+    if not normality_ok:
+        reasons.append('正規性が成立しない曜日があります')
+    if not homoscedasticity_ok:
+        reasons.append('等分散性が成立していません')
+    if not reasons:
+        reasons.append('正規性および等分散性が成立しました')
+
+    return {
+        'use_parametric': use_parametric,
+        'selected_test': selected_test,
+        'reason': ' / '.join(reasons),
+        'normality_ok': normality_ok,
+        'homoscedasticity_ok': homoscedasticity_ok
+    }
+
+
 def print_test_results(results: Dict[str, Any]):
     """
     検定結果を表示します。
@@ -98,47 +125,86 @@ def print_test_results(results: Dict[str, Any]):
         print(results["error"])
         return
     
-    print("=== パラメトリック検定結果 ===")
+    print("検定結果:")
+    if 'parametric' in results:
+        param = results['parametric']
+        if 'normality_tests' in param:
+            print("  正規性テスト (Shapiro-Wilk):")
+            for weekday, res in param['normality_tests'].items():
+                print(f"    {weekday}: statistic={res['statistic']:.4f}, p={res['p_value']:.4f}, normal={res['normal']}")
+        if 'homoscedasticity_test' in param:
+            homo = param['homoscedasticity_test']
+            print(f"  等分散テスト (Levene): statistic={homo['statistic']:.4f}, p={homo['p_value']:.4f}, homoscedastic={homo['homoscedastic']}")
+        if 'anova' in param:
+            anova = param['anova']
+            print(f"  ANOVA: F={anova['f_statistic']:.4f}, p={anova['p_value']:.4f}, significant={anova['significant']}")
+            if anova['significant'] and 'posthoc_tukey' in param:
+                print("    Tukey-Kramer POST-HOC: 有意差あり")
+    if 'nonparametric' in results:
+        nonparam = results['nonparametric']
+        if 'kruskal_wallis' in nonparam:
+            kw = nonparam['kruskal_wallis']
+            print(f"  Kruskal-Wallis: H={kw['h_statistic']:.4f}, p={kw['p_value']:.4f}, significant={kw['significant']}")
+            if kw['significant'] and 'posthoc_steel_dwass' in nonparam:
+                print("    Steel-Dwass POST-HOC: 有意差あり")
+
+def decide_and_print_tests(results: Dict[str, Any]):
+    """
+    正規性と等分散性の結果に基づいて、適切な検定を出力します。
+    - すべての曜日が正規分布で等分散の場合: ANOVA
+    - それ以外の場合: Kruskal-Wallis
+    """
+    if "error" in results:
+        print(results["error"])
+        return
     
-    # 正規性テスト
-    print("\n正規性テスト (Shapiro-Wilk):")
-    for weekday, res in results['parametric']['normality_tests'].items():
-        print(f"  {weekday}: p={res['p_value']:.4f} ({'正規' if res['normal'] else '非正規'})")
+    param = results.get('parametric', {})
     
-    # 等分散テスト
-    if 'homoscedasticity_test' in results['parametric']:
-        res = results['parametric']['homoscedasticity_test']
-        print(f"\n等分散テスト (Levene): p={res['p_value']:.4f} ({'等分散' if res['homoscedastic'] else '不等分散'})")
+    # 正規性チェック: すべての曜日が normal=True か
+    normality_ok = True
+    if 'normality_tests' in param:
+        for res in param['normality_tests'].values():
+            if not res['normal']:
+                normality_ok = False
+                break
     
-    # ANOVA
-    if 'anova' in results['parametric']:
-        res = results['parametric']['anova']
-        print(f"\nOne-way ANOVA: F={res['f_statistic']:.4f}, p={res['p_value']:.4f} ({'有意' if res['significant'] else '有意差なし'})")
-        
-        if res['significant'] and 'posthoc_tukey' in results['parametric']:
-            print("\nTukey-Kramer POST-HOC:")
-            print(results['parametric']['posthoc_tukey']['summary'])
+    # 等分散チェック
+    homoscedasticity_ok = param.get('homoscedasticity_test', {}).get('homoscedastic', False)
     
-    print("\n=== ノンパラメトリック検定結果 ===")
+    print("\n[3] 統計検定結果:")
     
-    # Kruskal-Wallis
-    if 'kruskal_wallis' in results['nonparametric']:
-        res = results['nonparametric']['kruskal_wallis']
-        print(f"\nKruskal-Wallis検定: H={res['h_statistic']:.4f}, p={res['p_value']:.4f} ({'有意' if res['significant'] else '有意差なし'})")
-        
-        if res['significant'] and 'posthoc_steel_dwass' in results['nonparametric']:
-            print("\nSteel-Dwass POST-HOC (p値行列):")
-            p_matrix = results['nonparametric']['posthoc_steel_dwass']['p_values']
-            groups = results['nonparametric']['posthoc_steel_dwass']['groups']
-            for i, row in enumerate(p_matrix):
-                for j, p_val in enumerate(row):
-                    if i < j:  # 上三角のみ表示
-                        print(f"  {groups[i]} vs {groups[j]}: p={p_val:.4f}")
+    # 正規性テスト出力
+    if 'normality_tests' in param:
+        print("  正規性テスト (Shapiro-Wilk):")
+        for weekday, res in param['normality_tests'].items():
+            print(f"    {weekday}: statistic={res['statistic']:.4f}, p={res['p_value']:.4f}, normal={res['normal']}")
+    
+    # 等分散テスト出力
+    if 'homoscedasticity_test' in param:
+        homo = param['homoscedasticity_test']
+        print(f"  等分散テスト (Levene): statistic={homo['statistic']:.4f}, p={homo['p_value']:.4f}, homoscedastic={homo['homoscedastic']}")
+    
+    # ロジックに基づく検定出力
+    if normality_ok and homoscedasticity_ok:
+        print("  帰無仮説採択（正規分布かつ等分散） → パラメトリック検定 (ANOVA):")
+        if 'anova' in param:
+            anova = param['anova']
+            print(f"    ANOVA: F={anova['f_statistic']:.4f}, p={anova['p_value']:.4f} ({'有意' if anova['significant'] else '有意差なし'})")
+            if anova['significant'] and 'posthoc_tukey' in param:
+                print("      Tukey-Kramer POST-HOC: 有意差あり")
+    else:
+        print("  帰無仮説棄却（正規分布でないか等分散でない） → ノンパラメトリック検定 (Kruskal-Wallis):")
+        nonparam = results.get('nonparametric', {})
+        if 'kruskal_wallis' in nonparam:
+            kw = nonparam['kruskal_wallis']
+            print(f"    Kruskal-Wallis: H={kw['h_statistic']:.4f}, p={kw['p_value']:.4f} ({'有意' if kw['significant'] else '有意差なし'})")
+            if kw['significant'] and 'posthoc_steel_dwass' in nonparam:
+                print("      Steel-Dwass POST-HOC: 有意差あり")
 
 if __name__ == "__main__":
-    # weekday_analysis.py からデータをインポートしてテスト
+    # src パッケージ経由で weekday_analysis をインポートしてテスト
     try:
-        from weekday_analysis import fetch_open_prices_with_dates, group_by_weekday
+        from src.data.weekday_analysis import fetch_open_prices_with_dates, group_by_weekday
         
         symbol = "SOL-JPY"
         df = fetch_open_prices_with_dates(symbol)
@@ -149,4 +215,4 @@ if __name__ == "__main__":
         else:
             print("データ取得に失敗しました。")
     except ImportError:
-        print("weekday_analysis.pyが見つからないか、必要なライブラリがインストールされていません。")
+        print("src.data.weekday_analysis が見つからないか、必要なライブラリがインストールされていません。")

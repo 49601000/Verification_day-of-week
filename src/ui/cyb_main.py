@@ -320,6 +320,31 @@ def render_test_results(data: Dict[str, Any]):
         st.error(tests["error"])
         return
     
+    # 判定ロジック
+    decision = tests.get('decision', {})
+    if decision:
+        selected = decision.get('selected_test', 'unknown')
+        use_parametric = decision.get('use_parametric', False)
+        method_name = 'ANOVA' if use_parametric else 'Kruskal-Wallis'
+        st.markdown(f"**推奨検定:** {method_name}")
+        st.markdown(f"- 理由: {decision.get('reason', '判定情報なし')}" )
+        st.markdown("---")
+    
+    # 正規性テスト
+    if 'parametric' in tests and 'normality_tests' in tests['parametric']:
+        st.markdown("**正規性テスト (Shapiro-Wilk):**")
+        for weekday, res in tests['parametric']['normality_tests'].items():
+            status = "正規" if res['normal'] else "非正規"
+            st.markdown(f"- {weekday}: p={res['p_value']:.4f} ({status})")
+        st.markdown("---")
+    
+    # 等分散テスト
+    if 'parametric' in tests and 'homoscedasticity_test' in tests['parametric']:
+        homo = tests['parametric']['homoscedasticity_test']
+        status = "等分散" if homo['homoscedastic'] else "不等分散"
+        st.markdown(f"**等分散テスト (Levene):** p={homo['p_value']:.4f} ({status})")
+        st.markdown("---")
+    
     # パラメトリック検定
     if 'parametric' in tests:
         param = tests['parametric']
@@ -415,7 +440,7 @@ def run():
     # サイドバー: 設定
     with st.sidebar:
         st.header("⚙️ 設定")
-        ticker = st.text_input("ティッカーシンボル", value="SOL-JPY", key="ticker_input")
+        ticker = st.text_input("ティッカーシンボル", value="", key="ticker_input")
         period = st.selectbox("期間", ["1y", "6mo", "3mo"], index=0)
         
         if st.button("分析実行", use_container_width=True):

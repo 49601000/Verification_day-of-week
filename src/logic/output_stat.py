@@ -1,10 +1,15 @@
 import pandas as pd
 from typing import Dict, Any
 import yfinance as yf
+import os
+import sys
+
+# パス追加
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 # 内部モジュールのインポート
 from src.data.weekday_analysis import fetch_open_prices_with_dates, group_by_weekday, calculate_weekday_stats
-from src.logic.statistical_tests import perform_statistical_tests
+from src.logic.statistical_tests import perform_statistical_tests, choose_test_strategy, decide_and_print_tests
 
 def get_indicator_descriptions() -> Dict[str, str]:
     """
@@ -37,6 +42,7 @@ def get_full_stat_report(df: pd.DataFrame, symbol: str = "UNKNOWN") -> Dict[str,
     
     # 3. 統計検定
     test_results = perform_statistical_tests(grouped_data)
+    test_results['decision'] = choose_test_strategy(test_results)
     
     # 階層型レポートの構築
     return {
@@ -84,29 +90,10 @@ def print_stat_report(result: Dict[str, Any]):
             stat = stats[weekday]
             print(f"    - {weekday}: 件数={stat['count']}, 平均={stat['mean']:.2f}, 標準偏差={stat['std']:.2f}")
     
-    print(f"\n[3] 統計検定結果:")
     if "error" in tests:
         print(f"    エラー: {tests['error']}")
     else:
-        # パラメトリック
-        if 'parametric' in tests:
-            param = tests['parametric']
-            print(f"    パラメトリック検定:")
-            if 'anova' in param:
-                anova = param['anova']
-                print(f"      - ANOVA: F={anova['f_statistic']:.4f}, p={anova['p_value']:.4f} ({'有意' if anova['significant'] else '有意差なし'})")
-                if anova['significant'] and 'posthoc_tukey' in param:
-                    print(f"        Tukey-Kramer POST-HOC: 有意差あり")
-        
-        # ノンパラメトリック
-        if 'nonparametric' in tests:
-            nonparam = tests['nonparametric']
-            print(f"    ノンパラメトリック検定:")
-            if 'kruskal_wallis' in nonparam:
-                kw = nonparam['kruskal_wallis']
-                print(f"      - Kruskal-Wallis: H={kw['h_statistic']:.4f}, p={kw['p_value']:.4f} ({'有意' if kw['significant'] else '有意差なし'})")
-                if kw['significant'] and 'posthoc_steel_dwass' in nonparam:
-                    print(f"        Steel-Dwass POST-HOC: 有意差あり")
+        decide_and_print_tests(tests)
     
     print("\n" + "="*60)
 
