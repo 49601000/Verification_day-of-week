@@ -283,6 +283,30 @@ def _build_table(headers, rows):
     return html
 
 
+def build_stat_data_from_report(report: Dict[str, Any]) -> Dict[str, Any]:
+    mode = report.get("metadata", {}).get("analysis_mode", "weekday")
+    if mode == "weekday":
+        weekday_order = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
+        group_order = [g for g in report["level_1_grouping"].keys() if g in weekday_order]
+        grouped_data = {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty and k in weekday_order}
+        weekday_stats = {k: v for k, v in report["level_2_stats"].items() if k in weekday_order}
+    else:
+        group_order = list(report["level_1_grouping"].keys())
+        grouped_data = {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty}
+        weekday_stats = report["level_2_stats"]
+
+    return {
+        "symbol": report["metadata"]["symbol"],
+        "total_records": report["metadata"]["total_records"],
+        "analysis_mode": mode,
+        "weekday_stats": weekday_stats,
+        "test_results": report["level_3_tests"],
+        "group_order": group_order,
+        "grouped_data": grouped_data,
+        "descriptions": report["descriptions"]
+    }
+
+
 # ─── UI パーツ ──────────────────────────
 
 def render_stat_header(data: Dict[str, Any]):
@@ -501,16 +525,7 @@ def run():
                 try:
                     raw_df = fetch_open_prices_with_dates(ticker_converted, period)
                     report = get_full_stat_report(raw_df, symbol=ticker_converted, mode=analysis_mode)
-                    stat_data = {
-                        "symbol": report["metadata"]["symbol"],
-                        "total_records": report["metadata"]["total_records"],
-                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
-                        "weekday_stats": report["level_2_stats"],
-                        "test_results": report["level_3_tests"],
-                        "group_order": list(report["level_1_grouping"].keys()),
-                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
-                        "descriptions": report["descriptions"]
-                    }
+                    stat_data = build_stat_data_from_report(report)
                     st.session_state['raw_df'] = raw_df
                     st.session_state['last_ticker'] = ticker_converted
                     st.session_state['last_period'] = period
@@ -528,16 +543,7 @@ def run():
                 ticker_converted = convert_ticker(ticker)
                 if ticker_converted == st.session_state.get('last_ticker') and period == st.session_state.get('last_period'):
                     report = get_full_stat_report(st.session_state['raw_df'], symbol=ticker_converted, mode=analysis_mode)
-                    st.session_state['stat_data'] = {
-                        "symbol": report["metadata"]["symbol"],
-                        "total_records": report["metadata"]["total_records"],
-                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
-                        "weekday_stats": report["level_2_stats"],
-                        "test_results": report["level_3_tests"],
-                        "group_order": list(report["level_1_grouping"].keys()),
-                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
-                        "descriptions": report["descriptions"]
-                    }
+                    st.session_state['stat_data'] = build_stat_data_from_report(report)
                     st.session_state['last_analysis_mode'] = analysis_mode
                     st.success(f"モードを {mode_select} に切り替えました。")
                 else:
@@ -548,16 +554,7 @@ def run():
             if ticker_converted == st.session_state.get('last_ticker') and period == st.session_state.get('last_period'):
                 if st.session_state.get('last_analysis_mode') != analysis_mode:
                     report = get_full_stat_report(st.session_state['raw_df'], symbol=ticker_converted, mode=analysis_mode)
-                    st.session_state['stat_data'] = {
-                        "symbol": report["metadata"]["symbol"],
-                        "total_records": report["metadata"]["total_records"],
-                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
-                        "weekday_stats": report["level_2_stats"],
-                        "test_results": report["level_3_tests"],
-                        "group_order": list(report["level_1_grouping"].keys()),
-                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
-                        "descriptions": report["descriptions"]
-                    }
+                    st.session_state['stat_data'] = build_stat_data_from_report(report)
                     st.session_state['last_analysis_mode'] = analysis_mode
             else:
                 if 'stat_data' in st.session_state:
