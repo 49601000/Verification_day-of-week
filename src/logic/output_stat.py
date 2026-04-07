@@ -110,14 +110,27 @@ def get_stat_data_for_skin(ticker: str, period: str = "300d", mode: str = "weekd
         return {"error": "データ取得または分析に失敗しました。"}
     
     # skin.py 用に整形
+    mode = report["metadata"].get("analysis_mode", "weekday")
+    
+    # 曜日モードの場合は平日だけを表示
+    if mode == "weekday":
+        weekday_order = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日']
+        group_order = [g for g in report["level_1_grouping"].keys() if g in weekday_order]
+        grouped_data = {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty and k in weekday_order}
+        weekday_stats = {k: v for k, v in report["level_2_stats"].items() if k in weekday_order}
+    else:
+        group_order = list(report["level_1_grouping"].keys())
+        grouped_data = {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty}
+        weekday_stats = report["level_2_stats"]
+    
     return {
         "symbol": report["metadata"]["symbol"],
         "total_records": report["metadata"]["total_records"],
-        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
-        "weekday_stats": report["level_2_stats"],
+        "analysis_mode": mode,
+        "weekday_stats": weekday_stats,
         "test_results": report["level_3_tests"],
-        "group_order": list(report["level_1_grouping"].keys()),
-        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
+        "group_order": group_order,
+        "grouped_data": grouped_data,
         "descriptions": report["descriptions"]
     }
 
