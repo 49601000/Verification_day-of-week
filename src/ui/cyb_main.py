@@ -523,6 +523,26 @@ def run():
         mode_select = st.selectbox("分析モード", ["曜日モード", "六曜モード"], index=0, key="analysis_mode_select")
         analysis_mode = "rokuyou" if mode_select == "六曜モード" else "weekday"
         
+        if st.button("モードを切り替える", use_container_width=True):
+            if 'raw_df' in st.session_state and ticker and period:
+                ticker_converted = convert_ticker(ticker)
+                if ticker_converted == st.session_state.get('last_ticker') and period == st.session_state.get('last_period'):
+                    report = get_full_stat_report(st.session_state['raw_df'], symbol=ticker_converted, mode=analysis_mode)
+                    st.session_state['stat_data'] = {
+                        "symbol": report["metadata"]["symbol"],
+                        "total_records": report["metadata"]["total_records"],
+                        "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
+                        "weekday_stats": report["level_2_stats"],
+                        "test_results": report["level_3_tests"],
+                        "group_order": list(report["level_1_grouping"].keys()),
+                        "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
+                        "descriptions": report["descriptions"]
+                    }
+                    st.session_state['last_analysis_mode'] = analysis_mode
+                    st.success(f"モードを {mode_select} に切り替えました。")
+                else:
+                    st.warning("データが存在しないか、ティッカー/期間が変更されています。")
+        
         if 'raw_df' in st.session_state and ticker and period:
             ticker_converted = convert_ticker(ticker)
             if ticker_converted == st.session_state.get('last_ticker') and period == st.session_state.get('last_period'):
@@ -533,6 +553,7 @@ def run():
                         "total_records": report["metadata"]["total_records"],
                         "analysis_mode": report["metadata"].get("analysis_mode", "weekday"),
                         "weekday_stats": report["level_2_stats"],
+                        "test_results": report["level_3_tests"],
                         "group_order": list(report["level_1_grouping"].keys()),
                         "grouped_data": {k: v.to_dict('records') for k, v in report["level_1_grouping"].items() if not v.empty},
                         "descriptions": report["descriptions"]
